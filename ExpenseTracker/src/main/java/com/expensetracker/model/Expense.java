@@ -1,17 +1,11 @@
 package com.expensetracker.model;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-
-@Document(collection = "expenses")
 public class Expense {
-    @Id
     private String id;
     private String description;
     private Double amount;
 
-    public Expense() {
-    }
+    public Expense() {}
 
     public Expense(String id, String description, Double amount) {
         this.id = id;
@@ -19,27 +13,10 @@ public class Expense {
         this.amount = amount;
     }
 
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public Double getAmount() {
-        return amount;
-    }
-
-    public void setAmount(Double amount) {
-        this.amount = amount;
-    }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public Double getAmount() { return amount; }
+    public void setAmount(Double amount) { this.amount = amount; }
 }
