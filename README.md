@@ -11,16 +11,20 @@ A simple console-based expense tracking application built with Java and Maven. T
 - **Interactive Menu**: User-friendly console interface
 - **Unique IDs**: Each expense gets a unique UUID identifier
 - **Data Validation**: Basic input validation for amounts
+- **Authentication**: Terminal-based login/sign up with BCrypt password hashing
+- **Per-user data**: Each user has their own isolated list of expenses
+- **Logout**: Switch accounts without restarting the app
 
 ## 🛠️ Tech Stack
 
 - **Language**: Java 17
 - **Build Tool**: Maven 3.6+
 - **Dependencies**: 
-  - Java Standard Library (no external dependencies)
+  - Java Standard Library
+  - BCrypt (`org.mindrot:jbcrypt:0.4`) for password hashing
   - Maven plugins for compilation and execution
 - **Architecture**: Console-based application with in-memory data storage
-- **Data Storage**: In-memory ArrayList (data persists only during runtime)
+- **Data Storage**: In-memory per-user `Map<String, List<Expense>>` (data persists only during runtime)
 
 ## 📁 Project Structure
 
@@ -35,6 +39,10 @@ ExpenseTracker/
 │               └── expensetracker/
 │                   └── model/
 │                       └── Expense.java                  # Expense data model
+│                   └── model/
+│                       └── User.java                     # User model (username + password hash)
+│                   └── service/
+│                       └── AuthService.java              # Signup/Login using BCrypt
 ├── target/                                              # Compiled classes and JAR files
 │   ├── classes/                                        # Compiled Java classes
 │   └── ExpenseTracker-0.0.1-SNAPSHOT.jar              # Executable JAR file
@@ -172,28 +180,31 @@ java -cp target/classes com.example.ExpenseTrackerApplication
 ### Starting the Application
 
 1. Run one of the commands above
-2. You'll see the main menu:
+2. You'll see the authentication menu first:
 
 ```
-Expense Tracker Menu:
-1. Add Expense
-2. View Expenses
-3. Edit Expense
-4. Delete Expense
-5. Exit
+Authentication Menu:
+1. Login
+2. Sign up
+3. Exit
 Choose an option:
 ```
 
+### Login or Sign up
+
+- Choose `2` to sign up (pick a unique username and password). Passwords are stored as BCrypt hashes in memory.
+- Choose `1` to log in with your credentials.
+
 ### Adding an Expense
 
-1. Choose option `1`
+1. After login, you'll see the expense menu. Choose option `1`.
 2. Enter description (e.g., "Groceries")
 3. Enter amount (e.g., `50.00`)
 4. Expense will be added with a unique ID
 
 ### Viewing Expenses
 
-1. Choose option `2`
+1. Choose option `2` (shows only the logged-in user's expenses)
 2. All expenses will be displayed in format:
    ```
    1. [uuid] Description - Amount
@@ -214,10 +225,10 @@ Choose an option:
 3. Enter the expense number to delete
 4. Expense will be removed from the list
 
-### Exiting the Application
+### Logout or Exit
 
-1. Choose option `5`
-2. Application will display "Goodbye!" and exit
+1. Choose `5` to log out and return to the authentication menu
+2. Choose `6` to exit the application
 
 ## 🔍 Code Structure Explanation
 
@@ -226,16 +237,15 @@ Choose an option:
 ```java
 // Key components:
 - Scanner scanner: Handles user input
-- List<Expense> expenses: In-memory storage
+- Map<String, List<Expense>> usernameToExpenses: In-memory per-user storage
 - main() method: Application entry point
-- Menu-driven interface with switch statement
+- Authentication menu (login/sign up) followed by expense menu
 ```
 
-**Methods:**
-- `addExpense()`: Creates new expense objects
-- `viewExpenses()`: Displays all expenses
-- `editExpense()`: Modifies existing expenses
-- `deleteExpense()`: Removes expenses from list
+**Key Methods:**
+- `showAuthMenu(...)`: Handles login/sign up/exit
+- `getUserExpenses()`: Returns the expense list for the current user
+- `addExpense()`, `viewExpenses()`, `editExpense()`, `deleteExpense()`
 
 ### Expense Model (`Expense.java`)
 
@@ -251,6 +261,21 @@ Choose an option:
 - Parameterized constructor
 - Getter and setter methods
 - Simple data model
+
+### User Model (`User.java`)
+
+```java
+// Data structure:
+- String username: Unique username
+- String passwordHash: BCrypt hash of the user's password
+```
+
+### Auth Service (`AuthService.java`)
+
+```java
+- signUp(username, password): Hashes password and registers a new user
+- login(username, password): Verifies password against stored BCrypt hash
+```
 
 ## ⚙️ Maven Configuration (`pom.xml`)
 
@@ -270,6 +295,9 @@ Choose an option:
 - maven-compiler-plugin: Compiles Java code
 - maven-jar-plugin: Creates executable JAR
 - exec-maven-plugin: Runs the application
+ 
+<!-- Dependencies -->
+- org.mindrot:jbcrypt:0.4 for password hashing
 ```
 
 ## 🔧 Troubleshooting
