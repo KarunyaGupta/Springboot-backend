@@ -1,13 +1,16 @@
 package com.example;
 
 import java.util.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import com.expensetracker.model.Expense;
 import com.expensetracker.model.User;
 import com.expensetracker.service.AuthService;
+import com.expensetracker.util.DatabaseUtil;
 
 public class ExpenseTrackerApplication {
     private static final Scanner scanner = new Scanner(System.in);
-    private static final Map<String, List<Expense>> usernameToExpenses = new HashMap<>();
     private static User currentUser = null;
 
     public static void main(String[] args) {
@@ -71,7 +74,6 @@ public class ExpenseTrackerApplication {
                 User loggedIn = authService.login(loginUser, loginPass);
                 if (loggedIn != null) {
                     currentUser = loggedIn;
-                    usernameToExpenses.putIfAbsent(currentUser.getUsername(), new ArrayList<>());
                     System.out.println("Login successful.");
                 } else {
                     System.out.println("Invalid credentials.");
@@ -103,14 +105,25 @@ public class ExpenseTrackerApplication {
         String description = scanner.nextLine();
         System.out.print("Enter amount: ");
         Double amount = Double.parseDouble(scanner.nextLine());
-        Expense expense = new Expense(UUID.randomUUID().toString(), description, amount);
-        List<Expense> expenses = getUserExpenses();
-        expenses.add(expense);
-        System.out.println("Expense added.");
+        String expenseId = UUID.randomUUID().toString();
+
+        try (Connection conn = DatabaseUtil.getConnection()) {
+            String sql = "INSERT INTO expenses (id, username, description, amount) VALUES (?, ?, ?, ?)";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, expenseId);
+            stmt.setString(2, currentUser.getUsername());
+            stmt.setString(3, description);
+            stmt.setDouble(4, amount);
+            stmt.executeUpdate();
+            System.out.println("Expense added to database.");
+        } catch (Exception e) {
+            System.out.println("Error adding expense: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     private static void viewExpenses() {
-        List<Expense> expenses = getUserExpenses();
+        List<Expense> expenses = fetchUserExpensesFromDB();
         if (expenses.isEmpty()) {
             System.out.println("No expenses found.");
             return;
@@ -123,7 +136,7 @@ public class ExpenseTrackerApplication {
     }
 
     private static void editExpense() {
-        List<Expense> expenses = getUserExpenses();
+        List<Expense> expenses = fetchUserExpensesFromDB();
         viewExpenses();
         if (expenses.isEmpty()) return;
         System.out.print("Enter expense number to edit: ");
@@ -137,13 +150,29 @@ public class ExpenseTrackerApplication {
         String desc = scanner.nextLine();
         System.out.print("New amount (" + e.getAmount() + "): ");
         String amtStr = scanner.nextLine();
-        if (!desc.isBlank()) e.setDescription(desc);
-        if (!amtStr.isBlank()) e.setAmount(Double.parseDouble(amtStr));
-        System.out.println("Expense updated.");
+        String newDesc = desc.isBlank() ? e.getDescription() : desc;
+        Double newAmt = amtStr.isBlank() ? e.getAmount() : Double.parseDouble(amtStr);
+
+        try (Connection conn = DatabaseUtil.getConnection()) {
+            String sql = "UPDATE expenses SET description = ?, amount = ? WHERE id = ?";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, newDesc);
+            stmt.setDouble(2, newAmt);
+            stmt.setString(3, e.getId());
+            int updated = stmt.executeUpdate();
+            if (updated > 0) {
+                System.out.println("Expense updated.");
+            } else {
+                System.out.println("Failed to update expense.");
+            }
+        } catch (Exception ex) {
+            System.out.println("Error updating expense: " + ex.getMessage());
+            ex.printStackTrace();
+        }
     }
 
     private static void deleteExpense() {
-        List<Expense> expenses = getUserExpenses();
+        List<Expense> expenses = fetchUserExpensesFromDB();
         viewExpenses();
         if (expenses.isEmpty()) return;
         System.out.print("Enter expense number to delete: ");
@@ -152,12 +181,42 @@ public class ExpenseTrackerApplication {
             System.out.println("Invalid number.");
             return;
         }
-        expenses.remove(idx);
-        System.out.println("Expense deleted.");
+        Expense e = expenses.get(idx);
+
+        try (Connection conn = DatabaseUtil.getConnection()) {
+            String sql = "DELETE FROM expenses WHERE id = ?";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, e.getId());
+            int deleted = stmt.executeUpdate();
+            if (deleted > 0) {
+                System.out.println("Expense deleted.");
+            } else {
+                System.out.println("Failed to delete expense.");
+            }
+        } catch (Exception ex) {
+            System.out.println("Error deleting expense: " + ex.getMessage());
+            ex.printStackTrace();
+        }
     }
 
-    private static List<Expense> getUserExpenses() {
-        usernameToExpenses.putIfAbsent(currentUser.getUsername(), new ArrayList<>());
-        return usernameToExpenses.get(currentUser.getUsername());
+    private static List<Expense> fetchUserExpensesFromDB() {
+        List<Expense> expenses = new ArrayList<>();
+        try (Connection conn = DatabaseUtil.getConnection()) {
+            String sql = "SELECT id, description, amount FROM expenses WHERE username = ?";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, currentUser.getUsername());
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                Expense e = new Expense();
+                e.setId(rs.getString("id"));
+                e.setDescription(rs.getString("description"));
+                e.setAmount(rs.getDouble("amount"));
+                expenses.add(e);
+            }
+        } catch (Exception e) {
+            System.out.println("Error fetching expenses: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return expenses;
     }
 }
